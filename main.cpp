@@ -18,6 +18,6 @@ int main(int argc, const char * argv[]) {
         return 1;
     }
     
-    fprintf(stderr, "(+) Opening \'%s\', found in %s\n", strrchr(argv[1], '/')+1, argv[1]);
+    fprintf(stderr, "(+) Opening \'%s\', found in %s\n", (strrchr(argv[1], '/')) ? strrchr(argv[1], '/')+1 : argv[1], argv[1]);
     printKernelConfig(argv[1]);
 }
