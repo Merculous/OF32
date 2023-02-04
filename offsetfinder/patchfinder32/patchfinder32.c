@@ -8,6 +8,9 @@
 
 #include "patchfinder32.h"
 
+
+#define HAS_BITS(a,b) (((a) & (b)) == (b))
+
 static uint32_t bit_range(uint32_t x, int start, int end)
 {
     x = (x << (31 - start)) >> (31 - start);
@@ -145,6 +148,26 @@ int insn_is_ldr_imm(uint16_t* i)
     return opA == 6 && (opB & 4) == 4;
 }
 
+int insn_is_pop(uint16_t *i){
+    return HAS_BITS(*i, 0b111110001101 << 8);
+}
+
+int insn_is_push(uint16_t *i){
+    return HAS_BITS(*i, 0b1011010 << 9);
+}
+
+int insn_is_thumb2_pop(uint16_t *i){
+    return (*i == 0xe8bd);
+}
+
+int insn_is_thumb2_push(uint16_t *i){
+    return (*i == 0xe92d);
+}
+
+int insn_is_thumb2_ldr(uint16_t *i){
+    return HAS_BITS(*i, 0b111110001101 << 4);
+}
+
 int insn_ldr_imm_rt(uint16_t* i)
 {
     return (*i & 7);
@@ -179,5 +202,37 @@ uint32_t insn_bl_imm32(uint16_t* i)
     uint32_t imm32 = (imm11 << 1) | (imm10 << 12) | (i2 << 22) | (i1 << 23) | (s ? 0xff000000 : 0);
     return imm32;
 }
+
+uint16_t* find_literal_ref(uint32_t region, uint8_t* kdata, size_t ksize, uint32_t address){
+    
+    for (uint16_t *p=kdata; p<kdata+ksize; p++) {
+        if (insn_add_reg_rm(p) == 15){
+            int rd = insn_add_reg_rd(p);
+            uint32_t val = 0;
+            uint32_t pc = (uint8_t*)p - kdata + region;
+            for (uint16_t *pp = p; pp>kdata; pp--) {
+                
+                if (insn_is_movt(pp) && insn_movt_rd(pp) == rd && !(val>>16)){
+                    val |= insn_movt_imm(pp) << 16;
+                }else if (insn_is_mov_imm(pp) && insn_mov_imm_rd(pp) == rd && !(val & ((1<<16)-1))){
+                    val |= insn_mov_imm_imm(pp);
+                }else if (insn_is_push(pp)){
+                    val=0;
+                    break;
+                }
+                if (val >> 16 && (val & ((1<<16)-1)))
+                    break;
+            }
+            if (!val)
+                continue;
+            
+            uint32_t ref = pc + 4 + val;
+            if (ref == address+region)
+                return p;
+        }
+    }
+    return 0;
+}
+
 
 /* patchfinder32 - END */
