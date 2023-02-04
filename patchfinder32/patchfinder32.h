@@ -11,6 +11,7 @@
 #ifndef patchfinder32_h
 #define patchfinder32_h
 
+#include <stddef.h>
 #include <stdint.h>
 
 int insn_is_32bit(uint16_t* i);
