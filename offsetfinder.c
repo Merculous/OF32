@@ -352,7 +352,7 @@ uint32_t find_task_for_pid(void)
 }
 
 #define FIND_OFFSET(name)               uint32_t off_##name = find_##name();
-#define PRINT_OFFSET(name)              fprintf(stdout, "[%-25s]: %#x\n", #name, off_##name)
+#define PRINT_OFFSET(name)              fprintf(stdout, "pushOffset(0x%08x); //%s\n", off_##name, #name)
 
 #define FIND_AND_PRINT_OFFSET(name)     { FIND_OFFSET(name); PRINT_OFFSET(name); }
 
