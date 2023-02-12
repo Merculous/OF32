@@ -36,6 +36,7 @@ enum {
 
 void *base = NULL;
 uint32_t kbase = 0;
+uint32_t ksize = 0;
 
 struct mach_header *mh = NULL;
 struct symtab_command *symtab = NULL;
@@ -355,33 +356,26 @@ uint32_t find_task_for_pid(void)
 
 #define FIND_AND_PRINT_OFFSET(name)     { FIND_OFFSET(name); PRINT_OFFSET(name); }
 
-int main(int argc, const char * argv[]) {
-
-    if (argc != 2) {
-        printf("Usage: ./OF32 [kernelcache_path]\n");
-        return 1;
-    }
-
-    fprintf(stdout, "(+) Opening \'%s\', found in %s\n", (strrchr(argv[1], '/')) ? strrchr(argv[1], '/')+1 : argv[1], argv[1]);
-
-    macho_map_t *map = map_macho_with_path(argv[1], O_RDONLY);
+int printKernelConfig(const char* kernelpath) {
+    macho_map_t *map = map_macho_with_path(kernelpath, O_RDONLY);
     assert(map);
-
+    
     mh = get_mach_header32(map);
-
+    
     if (mh->magic != MH_MAGIC) {
         printf("Error: Invalid kernelcache!\n");
         return 2;
     }
-
-    fprintf(stdout, "(+) Successfully mapped and validated kernelcache. Dumping offsets...\n\n");
-
+    
+    fprintf(stderr, "(+) Successfully mapped and validated kernelcache. Dumping offsets...\n\n");
+    
     base = map->map_data;
+    ksize = map->map_size;
     kbase = find_segment_command32(mh, SEG_TEXT)->vmaddr;
-
+    
     symtab = find_symtab_command(mh);
     assert(symtab);
-
+    printf("if (!dstrcmp(uname, \"%s\")){\n", ADDR_KCACHE_TO_MAP(find_sym("_version")->n_value));
     FIND_AND_PRINT_OFFSET(OSSerializer_serialize);
     FIND_AND_PRINT_OFFSET(OSSymbol_getMetaClass);
     FIND_AND_PRINT_OFFSET(calend_gettime);
@@ -390,14 +384,25 @@ int main(int argc, const char * argv[]) {
     FIND_AND_PRINT_OFFSET(copyin);
     FIND_AND_PRINT_OFFSET(bx_lr);
     FIND_AND_PRINT_OFFSET(write_gadget);
-    FIND_AND_PRINT_OFFSET(vm_kernel_addrperm);
+    FIND_AND_PRINT_OFFSET(vm_kernel_addrperm); //WRONG
     FIND_AND_PRINT_OFFSET(kernel_pmap);
-    FIND_AND_PRINT_OFFSET(flush_dcache);
     FIND_AND_PRINT_OFFSET(invalidate_tlb);
-    FIND_AND_PRINT_OFFSET(setreuid);
+    FIND_AND_PRINT_OFFSET(allproc); // WRONG
     FIND_AND_PRINT_OFFSET(proc_ucred);
-    FIND_AND_PRINT_OFFSET(task_for_pid);
-    FIND_AND_PRINT_OFFSET(allproc);
-
+    
+    uint32_t off_clock_ops = find_clock_ops();
+    uint32_t *off_orig_clockops_0 = *(uint32_t *)ADDR_KCACHE_TO_MAP(SLIDE(uint32_t, off_clock_ops, kbase));
+    uint32_t *off_orig_clockops_1 = *(uint32_t *)ADDR_KCACHE_TO_MAP(SLIDE(uint32_t, off_clock_ops+4, kbase));
+    uint32_t *off_orig_clockops_2 = *(uint32_t *)ADDR_KCACHE_TO_MAP(SLIDE(uint32_t, off_clock_ops+8, kbase));
+    uint32_t *off_orig_clockops_3 = *(uint32_t *)ADDR_KCACHE_TO_MAP(SLIDE(uint32_t, off_clock_ops+12, kbase));
+    uint32_t *off_orig_clockops_4 = *(uint32_t *)ADDR_KCACHE_TO_MAP(SLIDE(uint32_t, off_clock_ops+16, kbase));
+    
+    PRINT_OFFSET(orig_clockops_0);
+    PRINT_OFFSET(orig_clockops_1);
+    PRINT_OFFSET(orig_clockops_2);
+    PRINT_OFFSET(orig_clockops_3);
+    PRINT_OFFSET(orig_clockops_4);
+    printf("}\n");
+    
     return 0;
 }
